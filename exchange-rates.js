@@ -1,3 +1,6 @@
+const BASE = 'EUR';
+const DISPLAY = ['USD','CHF','GBP'];
+
 class CurrencyData {
 
     constructor(base = "EUR") {
@@ -15,16 +18,30 @@ class CurrencyData {
     }
 }
 
-async function displayCurrencies({ currenciesToDisplay = ['USD', 'CHF', 'GBP'], currencySourceData, displayStack } = {}) {
+class CurrencyWidgetElements {
 
-    async function _loadFlagImage(currencySymbol) {
-        const lowerCasedCurrencySymbol = currencySymbol.toLowerCase();
-        const i = new Request(`https://raw.githubusercontent.com/transferwise/currency-flags/master/src/flags/${lowerCasedCurrencySymbol}.png`);
-        return i.loadImage()
+    constructor({ currenciesToDisplay = ['USD', 'CHF', 'GBP'], currencySourceData } = {}) {
+        this.currenciesToDisplay = currenciesToDisplay;
+        this.currencySourceData = currencySourceData;
+        this.currencyElements = [];
     }
 
-    function _displayCurrencyRateItem(flagImage, rate, symbol) {
-        let newStack = displayStack.addStack();
+    async _loadFlagImage(currencySymbol) {
+        const lowerCasedCurrencySymbol = currencySymbol.toLowerCase();
+        const i = new Request(`https://raw.githubusercontent.com/transferwise/currency-flags/master/src/flags/${lowerCasedCurrencySymbol}.png`);
+        return i.loadImage();
+    }
+
+    async build() {
+        return Promise.all(this.currenciesToDisplay.map(async (currencySymbol) => {
+            let currencyFlagImage = await this._loadFlagImage(currencySymbol);
+            let currencyRate = (1 / this.currencySourceData.rates[currencySymbol]).toFixed(2);
+            this.currencyElements.push({ image: currencyFlagImage, rate: currencyRate, symbol: currencySymbol });
+        }));
+    }
+
+    _displayCurrencyRateItem(flagImage, rate, symbol) {
+        let newStack = this.displayStack.addStack();
 
         newStack.layoutHorizontally();
         newStack.addText(rate + ' ' + symbol);
@@ -36,17 +53,20 @@ async function displayCurrencies({ currenciesToDisplay = ['USD', 'CHF', 'GBP'], 
         newStack.addSpacer(4)
     }
 
-    currenciesToDisplay.forEach((currencySymbol) => {
-        let currencyFlagImage = await _loadFlagImage(currencySymbol);
-        let currencyRate = (1 / currencySourceData[currencySymbol]).toPrecision(2);
-        _displayCurrencyRateItem(currencyFlagImage, currencyRate, currencySymbol);
-    })
+    displayAll(stack) {
+        this.displayStack = stack;
+        this.currencyElements.forEach((element) => this._displayCurrencyRateItem(element.image, element.rate, element.symbol));
+    }
+
 
 };
 
-const currencyData = await new CurrencyData().fetch();
+const currencyData = new CurrencyData(BASE);
+await currencyData.fetch();
+const currencyElements = new CurrencyWidgetElements({ currenciesToDisplay: DISPLAY, currencySourceData: currencyData });
+await currencyElements.build();
 
-let widget = createWidget(amount)
+let widget = createWidget()
 if (config.runsInWidget) {
     // create and show widget
     Script.setWidget(widget)
@@ -56,7 +76,7 @@ else {
     widget.presentSmall()
 }
 
-function createWidget(amount) {
+function createWidget() {
     let w = new ListWidget()
     w.setPadding(8, 8, 8, 8)
     w.backgroundColor = new Color("#1A1A1A")
@@ -70,7 +90,7 @@ function createWidget(amount) {
 
     upperStack.addSpacer(10)
 
-    displayCurrencies({ currencySourceData: currencyData, displayStack: upperStack });
+    currencyElements.displayAll(upperStack);
 
     return w
 }
