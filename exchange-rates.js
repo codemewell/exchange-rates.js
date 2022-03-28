@@ -1,9 +1,9 @@
 const BASE = 'EUR';
-const DISPLAY = ['USD','CHF','GBP'];
+const DISPLAY = ['USD', 'CHF', 'GBP'];
 
 class CurrencyData {
 
-    constructor(base = "EUR") {
+    constructor(base = 'EUR') {
         this.base = base;
     }
 
@@ -33,11 +33,11 @@ class CurrencyWidgetElements {
     }
 
     async build() {
-        return Promise.all(this.currenciesToDisplay.map(async (currencySymbol) => {
+        return this.currenciesToDisplay.map((currencySymbol) => async () => {
             let currencyFlagImage = await this._loadFlagImage(currencySymbol);
             let currencyRate = (1 / this.currencySourceData.rates[currencySymbol]).toFixed(2);
             this.currencyElements.push({ image: currencyFlagImage, rate: currencyRate, symbol: currencySymbol });
-        }));
+        }).reduce((prevTask, currentTask) => prevTask.then(() => currentTask()), Promise.resolve());
     }
 
     _displayCurrencyRateItem(flagImage, rate, symbol) {
